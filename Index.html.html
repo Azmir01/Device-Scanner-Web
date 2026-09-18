@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Device Scanner</title>
+<style>
+:root {
+  --primary: #1F3A4D;
+  --on-primary: #FFFFFF;
+  --secondary-container: #FFE7A3;
+  --on-secondary-container: #2A2000;
+  --bg: #F7F9FA;
+  --on-bg: #191C1E;
+  --surface: #FFFFFF;
+  --surface-2: #F1F4F6;
+  --surface-3: #E6EAED;
+  --on-surface-variant: #41505A;
+  --border: #C1CBD2;
+  --error: #B3261E;
+  --error-bg: #FFDAD6;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --primary: #9CC3DD;
+    --on-primary: #0B2230;
+    --secondary-container: #5C4600;
+    --on-secondary-container: #FFE7A3;
+    --bg: #151B20;
+    --on-bg: #E1E3E5;
+    --surface: #1B2227;
+    --surface-2: #1F262C;
+    --surface-3: #293137;
+    --on-surface-variant: #BEC8CF;
+    --border: #41505A;
+    --error: #FFB4AB;
+    --error-bg: #5A2D28;
+  }
+}
+:root[data-theme="dark"] {
+  --primary: #9CC3DD;
+  --on-primary: #0B2230;
+  --secondary-container: #5C4600;
+  --on-secondary-container: #FFE7A3;
+  --bg: #151B20;
+  --on-bg: #E1E3E5;
+  --surface: #1B2227;
+  --surface-2: #1F262C;
+  --surface-3: #293137;
+  --on-surface-variant: #BEC8CF;
+  --border: #41505A;
+  --error: #FFB4AB;
+  --error-bg: #5A2D28;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--on-bg);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+#app { min-height: 100vh; padding-bottom: 96px; }
+
+.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; background: var(--primary); color: var(--on-primary);
+  position: sticky; top: 0; z-index: 5;
+}
+.topbar h1 { font-size: 19px; margin: 0; font-weight: 600; flex: 1; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.icon-btn {
+  background: transparent; border: none; color: inherit; font-size: 18px;
+  width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.icon-btn:hover { background: rgba(127,127,127,0.15); }
+.icon-btn.danger { color: var(--error); }
+
+.content { padding: 12px 16px; max-width: 640px; margin: 0 auto; }
+
+.empty { text-align: center; padding: 48px 16px; color: var(--on-surface-variant); }
+.empty h2 { color: var(--on-bg); margin-bottom: 8px; }
+.empty p { max-width: 46ch; margin: 0 auto; line-height: 1.5; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px; margin-bottom: 10px; cursor: pointer;
+}
+.job-card { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.job-card-title { font-size: 16px; font-weight: 600; }
+
+.room-header {
+  font-size: 13px; font-weight: 600; color: var(--on-secondary-container);
+  background: var(--secondary-container); padding: 8px 12px; border-radius: 8px;
+  margin: 16px 0 8px;
+}
+.room-count { font-weight: 400; opacity: 0.8; }
+.mono { font-family: var(--font-mono); }
+
+.content.wide { max-width: none; padding: 12px 0; }
+.table-hint { font-size: 12px; color: var(--on-surface-variant); padding: 0 16px; margin: 0 0 8px; }
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
+.table { display: flex; flex-direction: column; }
+.table-header-row {
+  display: flex; position: sticky; top: 0; z-index: 2;
+  background: var(--surface-3); font-size: 12px; font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+.room-band {
+  background: var(--secondary-container); color: var(--on-secondary-container);
+  font-size: 13px; font-weight: 600; padding: 7px 16px;
+}
+.table-row {
+  display: flex; border-bottom: 1px solid var(--surface-2); cursor: pointer;
+}
+.table-row:active { background: var(--surface-2); }
+.table-row .col { padding: 12px; font-size: 13px; display: flex; align-items: center; }
+.table-header-row .col { padding: 10px 12px; }
+.table .col {
+  flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border-right: 1px solid var(--surface-2);
+}
+.cell-empty { color: var(--on-surface-variant); }
+
+.fab {
+  position: fixed; right: 20px; bottom: 24px; z-index: 10;
+  background: #F2B51C; color: #2A2000; border: none; border-radius: 28px;
+  padding: 14px 22px; font-size: 15px; font-weight: 600; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  display: flex; align-items: flex-end; justify-content: center; z-index: 20;
+}
+@media (min-width: 640px) {
+  .modal-overlay { align-items: center; }
+}
+.modal {
+  background: var(--surface); border-radius: 16px 16px 0 0;
+  width: 100%; max-width: 520px; max-height: 92vh; overflow-y: auto;
+  padding: 20px;
+}
+@media (min-width: 640px) { .modal { border-radius: 16px; } }
+.modal h2 { margin: 0 0 14px; font-size: 18px; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.modal-header h2 { margin: 0; }
+.modal-body { display: flex; flex-direction: column; gap: 4px; }
+.modal-actions {
+  display: flex; justify-content: space-between; gap: 10px; margin-top: 18px;
+}
+
+.text-input {
+  width: 100%; padding: 11px 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--on-bg); font-size: 15px; margin-bottom: 12px;
+  font-family: var(--font-sans);
+}
+.text-input.mono { font-family: var(--font-mono); }
+.text-input.invalid { border-color: var(--error); }
+.field-label-top { font-size: 12px; color: var(--on-surface-variant); margin-bottom: 4px; display: block; }
+.field-error { font-size: 12px; color: var(--error); margin: -8px 0 10px; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.btn {
+  border: none; border-radius: 24px; padding: 12px 18px; font-size: 15px; font-weight: 600;
+  cursor: pointer; font-family: var(--font-sans);
+}
+.btn.primary { background: var(--primary); color: var(--on-primary); }
+.btn.ghost { background: transparent; color: var(--on-surface-variant); border: 1px solid var(--border); }
+.btn.ghost.danger { color: var(--error); border-color: var(--error); }
+.btn.wide { width: 100%; }
+.btn.small { padding: 8px 14px; font-size: 13px; margin-top: 8px; }
+
+.candidates { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -4px 0 10px; }
+.candidates-label { font-size: 12px; color: var(--on-surface-variant); margin-right: 2px; }
+.chip {
+  background: var(--surface-3); border: 1px solid var(--border); border-radius: 14px;
+  padding: 4px 10px; font-size: 12px; font-family: var(--font-mono); cursor: pointer; color: var(--on-bg);
+}
+
+.camera-wrap { border-radius: 12px; overflow: hidden; background: #000; margin-bottom: 8px; }
+.camera-wrap video { width: 100%; display: block; max-height: 60vh; object-fit: cover; }
+.photo-preview { width: 100%; border-radius: 12px; margin-bottom: 4px; display: block; }
+
+.scanning { text-align: center; padding: 32px 16px; color: var(--on-surface-variant); }
+.spinner {
+  width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--primary);
+  border-radius: 50%; margin: 0 auto 12px; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.toast {
+  position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%);
+  background: var(--on-bg); color: var(--bg); padding: 10px 18px; border-radius: 20px;
+  font-size: 13px; z-index: 30; max-width: 90vw; text-align: center;
+}
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+/* ===================== Parser (ported + validated from Kotlin LabelParser) ===================== */
+const HEX = "0123456789ABCDEF";
+const MAC_KEY = /(?<![A-Za-z0-9])(?:MAC|ETH(?:ERNET)?|HW\s*ADDR|EUI-?48)(?![A-Za-z])(?:\s*(?:ID|ADDRESS|ADDR|NO\.?|NUMBER)(?![A-Za-z]))?\s*[:#=.\-]*\s*/i;
+const WIFI_KEY = /(?<![A-Za-z0-9])(?:WI-?FI|WLAN|WIRELESS)(?:\s*(?:MAC|ADDRESS|ADDR|ID))?(?![A-Za-z])\s*[:#=.\-]*\s*/i;
+const IP_KEY = /(?<![A-Za-z0-9])(?:STATIC\s*IP|LAN\s*IP|IP(?:V4)?)(?:\s*(?:ADDRESS|ADDR))?(?![A-Za-z0-9])\s*[:#=.\-]*\s*/i;
+const SERIAL_KEY = /(?<![A-Za-z0-9])(?:SERIAL\s*(?:NUMBER|NUM|NO|#)?|SER\.?\s*(?:NO|#)|[S5]\s*[/\\|Il1]\s*NO?|P\/?SN|SN)(?![A-Za-z])\s*[.:#=\-]*\s*/i;
+const SEPARATED_MAC = /(?<![A-Za-z0-9])[A-Za-z0-9]{2}(?:[:\-.]\s?[A-Za-z0-9]{2}){5}(?![A-Za-z0-9])/g;
+const DOTTED_MAC = /(?<![A-Za-z0-9])[A-Za-z0-9]{4}\.[A-Za-z0-9]{4}\.[A-Za-z0-9]{4}(?![A-Za-z0-9])/g;
+const BARE_HEX12 = /(?<![A-Za-z0-9])[0-9A-Fa-f]{12}(?![A-Za-z0-9])/g;
+const IPV4 = /(?<![0-9.])(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}(?![0-9.])/g;
+
+function fixHex(c) { return { O: '0', Q: '0', I: '1', L: '1', S: '5', Z: '2', G: '6' }[c] || c; }
+function normalizeMac(raw, allowOcrFix = true) {
+  let s = raw.toUpperCase().split('').filter(c => /[A-Z0-9]/.test(c));
+  if (allowOcrFix) s = s.map(fixHex);
+  s = s.join('');
+  if (s.length !== 12 || [...s].some(c => !HEX.includes(c))) return null;
+  if (/^0+$/.test(s) || /^F+$/.test(s)) return null;
+  return s.match(/.{2}/g).join(':');
+}
+function isValidMac(raw) { return normalizeMac(raw, false) !== null; }
+function formatMac(raw) { return normalizeMac(raw, false) || raw.trim().toUpperCase(); }
+function isValidIp(s) { return s !== '0.0.0.0' && s !== '255.255.255.255'; }
+function compact(s) { return s.toUpperCase().split('').filter(c => /[A-Z0-9]/.test(c)).join(''); }
+function ocrKey(s) { return compact(s).split('').map(c => ({ O: '0', Q: '0', I: '1', L: '1', S: '5', Z: '2', B: '8', G: '6' }[c] || c)).join(''); }
+function twelveCharRuns(text) {
+  const tokens = text.trim().split(/\s+/).filter(Boolean);
+  const out = [];
+  for (let start = 0; start < Math.min(3, tokens.length); start++) {
+    let sb = '';
+    for (const tok of tokens.slice(start)) {
+      sb += tok.split('').filter(c => /[A-Za-z0-9]/.test(c)).join('');
+      if (sb.length >= 12) break;
+    }
+    if (sb.length === 12) out.push(sb);
+  }
+  return out;
+}
+function looksLikeSerial(s) { return s.length >= 4 && s.length <= 32 && /[0-9]/.test(s) && /^[A-Z0-9\-]+$/.test(s); }
+function serialToken(text) {
+  const tok = text.trim().split(/\s+/)[0];
+  if (!tok) return null;
+  const upper = tok.toUpperCase().replace(/^[^A-Z0-9]+/, '');
+  let sb = '';
+  for (const c of upper) { if (/[A-Z0-9\-]/.test(c)) sb += c; else break; }
+  sb = sb.replace(/^-+|-+$/g, '');
+  return looksLikeSerial(sb) ? sb : null;
+}
+function looksLikeMacToken(tok) {
+  const n = normalizeMac(tok, false);
+  return n !== null && (/[:\-.]/.test(tok) || /[A-Za-z]/.test(tok));
+}
+function serialFromNextLine(next) {
+  const tok = next.trim().split(/\s+/).find(t => t && !looksLikeMacToken(t));
+  return tok ? serialToken(tok) : null;
+}
+function addTally(t, v, s) { t[v] = (t[v] || 0) + s; }
+function mergeTallies(text, code) {
+  const out = { ...code };
+  for (const [value, score] of Object.entries(text)) {
+    const key = ocrKey(value);
+    const target = Object.keys(code).find(k => ocrKey(k) === key) || value;
+    out[target] = (out[target] || 0) + score;
+  }
+  return Object.entries(out).sort((a, b) => b[1] - a[1]);
+}
+const AUTO_FILL_MIN_SCORE = 1.0;
+
+function extractPortCandidates(textLines) {
+  const seen = new Set();
+  return textLines.map(l => l.trim()).filter(l => l.length > 0 && l.length <= 20)
+    .sort((a, b) => a.length - b.length)
+    .filter(l => { const k = l.toUpperCase(); if (seen.has(k)) return false; seen.add(k); return true; })
+    .slice(0, 5);
+}
+
+function parseLabel(textLines) {
+  const macText = {}, macCode = {}, wifiText = {}, ipText = {}, ipCode = {}, serialText = {}, serialCode = {}, wifiCode = {};
+  const lines = textLines.map(l => l.trim()).filter(Boolean);
+
+  lines.forEach((line, i) => {
+    const next = lines[i + 1] || '';
+    const wifiMatch = WIFI_KEY.exec(line);
+    if (wifiMatch) {
+      const rest = line.slice(wifiMatch.index + wifiMatch[0].length);
+      const sameLine = twelveCharRuns(rest).map(r => normalizeMac(r)).find(Boolean);
+      if (sameLine) addTally(wifiText, sameLine, 3.0);
+      else { const v = twelveCharRuns(next).map(r => normalizeMac(r)).find(Boolean); if (v) addTally(wifiText, v, rest.trim() ? 2.0 : 3.0); }
+    } else {
+      let m;
+      MAC_KEY.lastIndex = 0;
+      const macMatch = MAC_KEY.exec(line);
+      if (macMatch) {
+        const rest = line.slice(macMatch.index + macMatch[0].length);
+        const sameLine = twelveCharRuns(rest).map(r => normalizeMac(r)).find(Boolean);
+        if (sameLine) addTally(macText, sameLine, 3.0);
+        else { const v = twelveCharRuns(next).map(r => normalizeMac(r)).find(Boolean); if (v) addTally(macText, v, rest.trim() ? 2.0 : 3.0); }
+      }
+      SEPARATED_MAC.lastIndex = 0; while ((m = SEPARATED_MAC.exec(line))) { const n = normalizeMac(m[0]); if (n) addTally(macText, n, 2.5); }
+      DOTTED_MAC.lastIndex = 0; while ((m = DOTTED_MAC.exec(line))) { const n = normalizeMac(m[0]); if (n) addTally(macText, n, 2.5); }
+      BARE_HEX12.lastIndex = 0;
+      while ((m = BARE_HEX12.exec(line))) { const v = m[0]; if (/[A-Za-z]/.test(v) && /[0-9]/.test(v)) { const n = normalizeMac(v, false); if (n) addTally(macText, n, 1.0); } }
+    }
+    const ipMatch = IP_KEY.exec(line);
+    if (ipMatch) {
+      const rest = line.slice(ipMatch.index + ipMatch[0].length);
+      IPV4.lastIndex = 0; const mm = IPV4.exec(rest);
+      if (mm && isValidIp(mm[0])) addTally(ipText, mm[0], 3.0);
+      else { IPV4.lastIndex = 0; const mm2 = IPV4.exec(next); if (mm2 && isValidIp(mm2[0])) addTally(ipText, mm2[0], rest.trim() ? 2.0 : 3.0); }
+    } else {
+      IPV4.lastIndex = 0; let m; while ((m = IPV4.exec(line))) { if (isValidIp(m[0])) addTally(ipText, m[0], 1.0); }
+    }
+    SERIAL_KEY.lastIndex = 0;
+    const serMatch = SERIAL_KEY.exec(line);
+    if (serMatch) {
+      const rest = line.slice(serMatch.index + serMatch[0].length);
+      const sameLine = serialToken(rest);
+      if (sameLine) addTally(serialText, sameLine, 3.0);
+      else { const v = serialFromNextLine(next); if (v) addTally(serialText, v, rest.trim() ? 2.0 : 3.0); }
+    }
+  });
+
+  const macs = mergeTallies(macText, macCode);
+  const wifis = mergeTallies(wifiText, wifiCode);
+  const ips = mergeTallies(ipText, ipCode);
+  const serials = mergeTallies(serialText, serialCode);
+  const labelledSerials = new Set(Object.keys(serialText).map(compact));
+  const macFinal = macs.filter(([value, score]) => !(score <= 1.0 && labelledSerials.has(compact(value))));
+
+  return {
+    mac: (macFinal.find(([, s]) => s >= AUTO_FILL_MIN_SCORE) || [''])[0],
+    mac2: (macFinal.slice(1).find(([, s]) => s >= AUTO_FILL_MIN_SCORE) || [''])[0],
+    wifiMac: (wifis.find(([, s]) => s >= AUTO_FILL_MIN_SCORE) || [''])[0],
+    ip: (ips.find(([, s]) => s >= AUTO_FILL_MIN_SCORE) || [''])[0],
+    serial: (serials.find(([, s]) => s >= AUTO_FILL_MIN_SCORE) || [''])[0],
+    macCandidates: macFinal.map(([v]) => v).slice(0, 5),
+    wifiCandidates: wifis.map(([v]) => v).slice(0, 5),
+    ipCandidates: ips.map(([v]) => v).slice(0, 5),
+    serialCandidates: serials.map(([v]) => v).slice(0, 5),
+  };
+}
+
+/* ===================== IndexedDB storage ===================== */
+const DB_NAME = 'device_scanner_web';
+const DB_VERSION = 1;
+let dbPromise = null;
+
+function openDb() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('jobs')) {
+        db.createObjectStore('jobs', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('devices')) {
+        const store = db.createObjectStore('devices', { keyPath: 'id' });
+        store.createIndex('jobId', 'jobId', { unique: false });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return dbPromise;
+}
+function tx(storeName, mode) {
+  return openDb().then(db => db.transaction(storeName, mode).objectStore(storeName));
+}
+function reqToPromise(req) {
+  return new Promise((resolve, reject) => { req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); });
+}
+function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 9); }
+
+const Store = {
+  async allJobs() {
+    const store = await tx('jobs', 'readonly');
+    const jobs = await reqToPromise(store.getAll());
+    return jobs.sort((a, b) => b.createdAt - a.createdAt);
+  },
+  async addJob(name) {
+    const store = await tx('jobs', 'readwrite');
+    const job = { id: newId(), name, createdAt: Date.now() };
+    await reqToPromise(store.add(job));
+    return job;
+  },
+  async deleteJob(jobId) {
+    const devStore = await tx('devices', 'readwrite');
+    const idx = devStore.index('jobId');
+    const devices = await reqToPromise(idx.getAll(jobId));
+    for (const d of devices) await reqToPromise(devStore.delete(d.id));
+    const jobStore = await tx('jobs', 'readwrite');
+    await reqToPromise(jobStore.delete(jobId));
+  },
+  async devicesForJob(jobId) {
+    const store = await tx('devices', 'readonly');
+    const idx = store.index('jobId');
+    const devices = await reqToPromise(idx.getAll(jobId));
+    return devices.sort((a, b) => a.createdAt - b.createdAt);
+  },
+  async addDevice(device) {
+    const store = await tx('devices', 'readwrite');
+    const row = { id: newId(), createdAt: Date.now(), ...device };
+    await reqToPromise(store.add(row));
+    return row;
+  },
+  async updateDevice(device) {
+    const store = await tx('devices', 'readwrite');
+    await reqToPromise(store.put(device));
+  },
+  async deleteDevice(deviceId) {
+    const store = await tx('devices', 'readwrite');
+    await reqToPromise(store.delete(deviceId));
+  },
+  async roomsForJob(jobId) {
+    const devices = await this.devicesForJob(jobId);
+    return [...new Set(devices.map(d => d.room).filter(Boolean))];
+  },
+};
+
+/* ===================== Camera + OCR ===================== */
+let ocrWorker = null;
+let ocrWorkerPromise = null;
+
+function getOcrWorker() {
+  if (ocrWorkerPromise) return ocrWorkerPromise;
+  ocrWorkerPromise = Tesseract.createWorker('eng', 1, {
+    workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
+    corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5',
+  }).then(w => { ocrWorker = w; return w; });
+  return ocrWorkerPromise;
+}
+
+async function scanCanvas(canvas) {
+  const worker = await getOcrWorker();
+  const result = await worker.recognize(canvas);
+  const lines = (result.data.text || '').split('\n').map(l => l.trim()).filter(Boolean);
+  return { lines, parsed: parseLabel(lines) };
+}
+
+async function scanCanvasForPort(canvas) {
+  const worker = await getOcrWorker();
+  const result = await worker.recognize(canvas);
+  const lines = (result.data.text || '').split('\n').map(l => l.trim()).filter(Boolean);
+  return extractPortCandidates(lines);
+}
+
+function canvasToJpegDataUrl(canvas, quality = 0.85) {
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
+async function startCamera(videoEl) {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1600 }, height: { ideal: 1200 } },
+    audio: false,
+  });
+  videoEl.srcObject = stream;
+  await videoEl.play();
+  return stream;
+}
+function stopCamera(stream) {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+}
+function captureFrame(videoEl) {
+  const canvas = document.createElement('canvas');
+  canvas.width = videoEl.videoWidth;
+  canvas.height = videoEl.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+/* ===================== App state & rendering ===================== */
+const state = {
+  screen: 'jobs',
+  jobs: [],
+  currentJobId: null,
+  devices: [],
+  roomSuggestions: [],
+  modal: null, // 'newJob' | 'deviceForm' | null
+  form: null,
+  toast: null,
+  cameraStream: null,
+};
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function showToast(msg) {
+  state.toast = msg;
+  render();
+  setTimeout(() => { if (state.toast === msg) { state.toast = null; render(); } }, 2600);
+}
+
+const App = {};
+window.App = App;
+
+App.init = async function () {
+  state.jobs = await Store.allJobs();
+  render();
+};
+
+App.goHome = async function () {
+  stopCamera(state.cameraStream); state.cameraStream = null;
+  state.screen = 'jobs';
+  state.jobs = await Store.allJobs();
+  render();
+};
+
+App.openJob = async function (jobId) {
+  state.currentJobId = jobId;
+  state.devices = await Store.devicesForJob(jobId);
+  state.screen = 'jobDetail';
+  render();
+};
+
+App.showNewJobModal = function () { state.modal = 'newJob'; render(); };
+App.closeModal = function () { state.modal = null; render(); };
+
+App.createJob = async function () {
+  const input = document.getElementById('newJobName');
+  const name = (input && input.value || '').trim();
+  if (!name) return;
+  const job = await Store.addJob(name);
+  state.modal = null;
+  await App.openJob(job.id);
+};
+
+App.deleteJob = async function (jobId) {
+  if (!confirm('Delete this job and all its devices? This cannot be undone.')) return;
+  await Store.deleteJob(jobId);
+  await App.goHome();
+};
+
+/* ---- Add / edit device form ---- */
+function blankForm(mode, deviceId) {
+  return {
+    mode, deviceId,
+    room: state.roomSuggestions[0] || '',
+    deviceName: '', mac: '', mac2: '', wifiMac: '', ip: '', serial: '', portLocal: '', portRack: '',
+    macCandidates: [], wifiCandidates: [], ipCandidates: [], serialCandidates: [],
+    photoDataUrl: null,
+    scanning: false,
+    cameraOpen: false,
+  };
+}
+
+App.startAddDevice = async function () {
+  state.roomSuggestions = await Store.roomsForJob(state.currentJobId);
+  state.form = blankForm('add', null);
+  state.modal = 'deviceForm';
+  render();
+};
+
+App.editDevice = function (deviceId) {
+  const d = state.devices.find(x => x.id === deviceId);
+  if (!d) return;
+  state.form = {
+    mode: 'edit', deviceId: d.id,
+    room: d.room, deviceName: d.deviceName, mac: d.mac, mac2: d.mac2, wifiMac: d.wifiMac,
+    ip: d.ip, serial: d.serial, portLocal: d.portLocal, portRack: d.portRack,
+    macCandidates: [], wifiCandidates: [], ipCandidates: [], serialCandidates: [],
+    photoDataUrl: d.photoDataUrl || null,
+    scanning: false, cameraOpen: false,
+  };
+  state.modal = 'deviceForm';
+  render();
+};
+
+App.closeDeviceForm = function () {
+  stopCamera(state.cameraStream); state.cameraStream = null;
+  state.modal = null; state.form = null;
+  render();
+};
+
+App.openCameraForForm = async function () {
+  state.form.cameraOpen = true;
+  render();
+  try {
+    const video = document.getElementById('formCamera');
+    state.cameraStream = await startCamera(video);
+  } catch (e) {
+    showToast('Could not open the camera: ' + e.message);
+    state.form.cameraOpen = false;
+    render();
+  }
+};
+
+App.captureAndScan = async function () {
+  const video = document.getElementById('formCamera');
+  if (!video) return;
+  const canvas = captureFrame(video);
+  state.form.photoDataUrl = canvasToJpegDataUrl(canvas);
+  stopCamera(state.cameraStream); state.cameraStream = null;
+  state.form.cameraOpen = false;
+  state.form.scanning = true;
+  render();
+  try {
+    const { parsed } = await scanCanvas(canvas);
+    Object.assign(state.form, {
+      mac: parsed.mac, mac2: parsed.mac2, wifiMac: parsed.wifiMac, ip: parsed.ip, serial: parsed.serial,
+      macCandidates: parsed.macCandidates, wifiCandidates: parsed.wifiCandidates,
+      ipCandidates: parsed.ipCandidates, serialCandidates: parsed.serialCandidates,
+    });
+    showToast('Scanned — check the values below');
+  } catch (e) {
+    showToast("Scanning didn't work this time — you can type the values in.");
+  }
+  state.form.scanning = false;
+  render();
+};
+
+App.retakePhoto = function () {
+  state.form.photoDataUrl = null;
+  App.openCameraForForm();
+};
+
+App.setFormField = function (field, value) {
+  state.form[field] = value;
+};
+
+App.useCandidate = function (field, value) {
+  state.form[field] = value;
+  render();
+};
+
+App.revalidateField = function (id) {
+  const input = document.getElementById(id);
+  if (!input) return;
+  const value = input.value.trim();
+  const invalid = value && !isValidMac(value);
+  input.classList.toggle('invalid', !!invalid);
+  const next = input.nextElementSibling;
+  const hasError = next && next.classList && next.classList.contains('field-error');
+  if (invalid) {
+    if (!hasError) {
+      const div = document.createElement('div');
+      div.className = 'field-error';
+      div.textContent = 'A MAC needs 12 hex characters (0-9, A-F)';
+      input.insertAdjacentElement('afterend', div);
+    }
+  } else if (hasError) {
+    next.remove();
+  }
+};
+
+App.saveDevice = async function () {
+  const f = state.form;
+  const room = (document.getElementById('fRoom')?.value ?? f.room ?? '').trim();
+  const deviceName = (document.getElementById('fDeviceName')?.value ?? f.deviceName ?? '').trim();
+  if (!room) { showToast('Enter a room before saving'); return; }
+  const payload = {
+    jobId: state.currentJobId,
+    room, deviceName,
+    mac: formatMac(document.getElementById('fMac')?.value ?? f.mac ?? ''),
+    mac2: (document.getElementById('fMac2')?.value ?? f.mac2 ?? '').trim() ? formatMac(document.getElementById('fMac2').value) : '',
+    wifiMac: (document.getElementById('fWifiMac')?.value ?? f.wifiMac ?? '').trim() ? formatMac(document.getElementById('fWifiMac').value) : '',
+    ip: (document.getElementById('fIp')?.value ?? f.ip ?? '').trim(),
+    serial: (document.getElementById('fSerial')?.value ?? f.serial ?? '').trim(),
+    portLocal: (document.getElementById('fPortLocal')?.value ?? f.portLocal ?? '').trim(),
+    portRack: (document.getElementById('fPortRack')?.value ?? f.portRack ?? '').trim(),
+    photoDataUrl: f.photoDataUrl || null,
+  };
+  if (f.mode === 'add') {
+    await Store.addDevice(payload);
+    showToast('Device saved');
+  } else {
+    await Store.updateDevice({ id: f.deviceId, createdAt: state.devices.find(d => d.id === f.deviceId)?.createdAt || Date.now(), ...payload });
+    showToast('Device updated');
+  }
+  state.modal = null; state.form = null;
+  state.devices = await Store.devicesForJob(state.currentJobId);
+  render();
+};
+
+App.deleteDevice = async function () {
+  const f = state.form;
+  if (!f.deviceId) return;
+  if (!confirm('Delete this device?')) return;
+  await Store.deleteDevice(f.deviceId);
+  state.modal = null; state.form = null;
+  state.devices = await Store.devicesForJob(state.currentJobId);
+  render();
+};
+
+/* ===================== Render ===================== */
+function chip(field, value) {
+  return `<button type="button" class="chip" onclick="App.useCandidate('${field}', this.dataset.v)" data-v="${esc(value)}">${esc(value)}</button>`;
+}
+function candidateRow(label, field, value, candidates) {
+  const others = candidates.filter(c => c.toUpperCase() !== (value || '').toUpperCase());
+  return others.length ? `<div class="candidates"><span class="candidates-label">Also found</span>${others.map(c => chip(field, c)).join('')}</div>` : '';
+}
+
+function renderJobs() {
+  const list = state.jobs;
+  const body = list.length === 0
+    ? `<div class="empty">
+         <h2>No jobs yet</h2>
+         <p>Create a job, then add devices to it. Point the camera at a label and the MAC, IP and serial number get read automatically.</p>
+       </div>`
+    : `<div class="job-list">${list.map(j => `
+        <div class="card job-card" onclick="App.openJob('${j.id}')">
+          <div class="job-card-main">
+            <div class="job-card-title">${esc(j.name)}</div>
+          </div>
+          <button class="icon-btn danger" onclick="event.stopPropagation(); App.deleteJob('${j.id}')" title="Delete job">✕</button>
+        </div>`).join('')}</div>`;
+
+  return `
+    <div class="topbar"><h1>Jobs</h1></div>
+    <div class="content">${body}</div>
+    <button class="fab" onclick="App.showNewJobModal()">+ New job</button>
+    ${state.modal === 'newJob' ? newJobModal() : ''}
+  `;
+}
+
+function newJobModal() {
+  return `
+    <div class="modal-overlay" onclick="if(event.target===this) App.closeModal()">
+      <div class="modal">
+        <h2>New job</h2>
+        <input id="newJobName" class="text-input" placeholder="e.g. The Peppermint Factory" autofocus />
+        <div class="modal-actions">
+          <button class="btn ghost" onclick="App.closeModal()">Cancel</button>
+          <button class="btn primary" onclick="App.createJob()">Create</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+const TABLE_COLS = [
+  { key: 'deviceName', label: 'Device Name', width: 150 },
+  { key: 'serial', label: 'S/N', width: 170 },
+  { key: 'mac', label: 'MAC 1', width: 160 },
+  { key: 'mac2', label: 'MAC 2', width: 160 },
+  { key: 'wifiMac', label: 'Wifi MAC', width: 160 },
+  { key: 'ip', label: 'IP Address', width: 130 },
+  { key: 'portLocal', label: 'Port Local', width: 100 },
+  { key: 'portRack', label: 'Port Rack', width: 100 },
+];
+const TABLE_WIDTH = TABLE_COLS.reduce((sum, c) => sum + c.width, 0);
+
+function renderJobDetail() {
+  const job = state.jobs.find(j => j.id === state.currentJobId) || { name: '' };
+  const byRoom = {};
+  state.devices.forEach(d => { (byRoom[d.room || 'No room'] = byRoom[d.room || 'No room'] || []).push(d); });
+  const rooms = Object.keys(byRoom);
+
+  const body = state.devices.length === 0
+    ? `<div class="empty"><h2>No devices yet</h2><p>Tap "Add device" and point the camera at a label.</p></div>`
+    : `
+      <p class="table-hint">Swipe sideways to see every column. Tap a row to edit.</p>
+      <div class="table-scroll">
+        <div class="table" style="width:${TABLE_WIDTH}px">
+          <div class="table-header-row">
+            ${TABLE_COLS.map(c => `<div class="col" style="width:${c.width}px">${c.label}</div>`).join('')}
+          </div>
+          ${rooms.map(room => `
+            <div class="room-band">${esc(room)} <span class="room-count">(${byRoom[room].length})</span></div>
+            ${byRoom[room].map(deviceRow).join('')}
+          `).join('')}
+        </div>
+      </div>`;
+
+  return `
+    <div class="topbar">
+      <button class="icon-btn" onclick="App.goHome()">←</button>
+      <h1 class="truncate">${esc(job.name)}</h1>
+    </div>
+    <div class="content wide">${body}</div>
+    <button class="fab" onclick="App.startAddDevice()">+ Add device</button>
+    ${state.modal === 'deviceForm' ? deviceFormModal() : ''}
+  `;
+}
+
+function cellText(value) {
+  return value ? `<span class="mono">${esc(value)}</span>` : `<span class="cell-empty">—</span>`;
+}
+function deviceRow(d) {
+  return `
+    <div class="table-row" onclick="App.editDevice('${d.id}')">
+      ${TABLE_COLS.map(c => {
+        const raw = d[c.key] || '';
+        const content = c.key === 'deviceName' ? esc(raw || 'Unnamed device') : cellText(raw);
+        return `<div class="col" style="width:${c.width}px">${content}</div>`;
+      }).join('')}
+    </div>`;
+}
+function macFieldWithValidation(id, label, value, candidates, field, required) {
+  const invalid = value && !isValidMac(value);
+  return `
+    <label class="field-label-top">${label}</label>
+    <input id="${id}" class="text-input mono${invalid ? ' invalid' : ''}" value="${esc(value)}" oninput="App.setFormField('${field}', this.value); App.revalidateField('${id}')" />
+    ${invalid ? '<div class="field-error">A MAC needs 12 hex characters (0-9, A-F)</div>' : ''}
+    ${candidateRow(label, field, value, candidates)}`;
+}
+
+function deviceFormModal() {
+  const f = state.form;
+  const title = f.mode === 'add' ? 'Add device' : 'Edit device';
+
+  let photoSection;
+  if (f.cameraOpen) {
+    photoSection = `
+      <div class="camera-wrap">
+        <video id="formCamera" playsinline muted></video>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" onclick="App.closeDeviceForm()">Cancel</button>
+        <button class="btn primary" onclick="App.captureAndScan()">📷 Capture &amp; scan</button>
+      </div>`;
+  } else if (f.scanning) {
+    photoSection = `<div class="scanning"><div class="spinner"></div><p>Reading the label…</p></div>`;
+  } else if (f.photoDataUrl) {
+    photoSection = `
+      <img class="photo-preview" src="${f.photoDataUrl}" />
+      <button class="btn ghost small" onclick="App.retakePhoto()">Retake photo</button>`;
+  } else {
+    photoSection = `<button class="btn primary wide" onclick="App.openCameraForForm()">📷 Scan a label</button>`;
+  }
+
+  const showFields = !f.cameraOpen && !f.scanning;
+
+  return `
+    <div class="modal-overlay">
+      <div class="modal wide">
+        <div class="modal-header">
+          <h2>${title}</h2>
+          <button class="icon-btn" onclick="App.closeDeviceForm()">✕</button>
+        </div>
+        <div class="modal-body">
+          ${photoSection}
+          ${showFields ? `
+            <label class="field-label-top">Room</label>
+            <input id="fRoom" class="text-input" list="roomList" value="${esc(f.room)}" placeholder="e.g. Level 3 Room 40.1" oninput="App.setFormField('room', this.value)" />
+            <datalist id="roomList">${state.roomSuggestions.map(r => `<option value="${esc(r)}">`).join('')}</datalist>
+
+            <label class="field-label-top">Device name</label>
+            <input id="fDeviceName" class="text-input" value="${esc(f.deviceName)}" placeholder="e.g. Wireless access point" oninput="App.setFormField('deviceName', this.value)" />
+
+            <div class="two-col">
+              <div>
+                <label class="field-label-top">Port local (optional)</label>
+                <input id="fPortLocal" class="text-input" value="${esc(f.portLocal)}" oninput="App.setFormField('portLocal', this.value)" />
+              </div>
+              <div>
+                <label class="field-label-top">Port rack (optional)</label>
+                <input id="fPortRack" class="text-input" value="${esc(f.portRack)}" oninput="App.setFormField('portRack', this.value)" />
+              </div>
+            </div>
+
+            ${macFieldWithValidation('fMac', 'MAC 1', f.mac, f.macCandidates, 'mac')}
+            ${macFieldWithValidation('fMac2', 'MAC 2 (optional)', f.mac2, f.macCandidates, 'mac2')}
+            ${macFieldWithValidation('fWifiMac', 'Wifi MAC (optional)', f.wifiMac, f.wifiCandidates, 'wifiMac')}
+
+            <label class="field-label-top">IP address</label>
+            <input id="fIp" class="text-input mono" value="${esc(f.ip)}" oninput="App.setFormField('ip', this.value)" />
+            ${candidateRow('IP address', 'ip', f.ip, f.ipCandidates)}
+
+            <label class="field-label-top">Serial number (S/N)</label>
+            <input id="fSerial" class="text-input mono" value="${esc(f.serial)}" oninput="App.setFormField('serial', this.value)" />
+            ${candidateRow('Serial', 'serial', f.serial, f.serialCandidates)}
+          ` : ''}
+        </div>
+        ${showFields ? `
+          <div class="modal-actions">
+            ${f.mode === 'edit' ? `<button class="btn ghost danger" onclick="App.deleteDevice()">Delete</button>` : '<span></span>'}
+            <button class="btn primary" onclick="App.saveDevice()">Save device</button>
+          </div>` : ''}
+      </div>
+    </div>`;
+}
+
+function render() {
+  const root = document.getElementById('app');
+  let html = state.screen === 'jobDetail' ? renderJobDetail() : renderJobs();
+  html += state.toast ? `<div class="toast">${esc(state.toast)}</div>` : '';
+  root.innerHTML = html;
+
+  if (state.modal === 'deviceForm' && state.form && state.form.cameraOpen) {
+    const video = document.getElementById('formCamera');
+    if (video && state.cameraStream) video.srcObject = state.cameraStream;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => { App.init(); });
+
+</script>
+</body>
+</html>
